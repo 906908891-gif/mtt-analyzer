@@ -1,0 +1,16 @@
+plate,well,group,concentration_m,absorbance
+board1,A1,Control,,0.852
+board1,A2,Control,,0.871
+board1,A3,Control,,0.834
+board1,B1,Treatment_1uM,1e-6,0.745
+board1,B2,Treatment_1uM,1e-6,0.762
+board1,B3,Treatment_1uM,1e-6,0.731
+board1,C1,Treatment_10uM,1e-5,0.412
+board1,C2,Treatment_10uM,1e-5,0.398
+board1,C3,Treatment_10uM,1e-5,0.425
+board1,D1,Treatment_100uM,1e-4,0.158
+board1,D2,Treatment_100uM,1e-4,0.149
+board1,D3,Treatment_100uM,1e-4,0.162
+board1,E1,Treatment_1mM,1e-3,0.087
+board1,E2,Treatment_1mM,1e-3,0.092
+board1,E3,Treatment_1mM,1e-3,0.084

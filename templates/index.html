@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MTT 实验数据分析器 - 多板版</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+<header>
+  <div>
+    <h1>MTT 实验数据分析器 <span style="font-size:0.7rem;font-weight:400;opacity:0.7;margin-left:0.4rem;">多板版</span></h1>
+    <p>手动分组 · 跨板聚合 · 4PL/IC50 · 自动保存</p>
+  </div>
+  <div class="badges">
+    <span class="badge" id="plateCountBadge">0 板</span>
+    <span class="badge" id="groupCountBadge">0 组</span>
+    <span class="badge">全本地 · 零上传</span>
+  </div>
+</header>
+
+<div class="session-bar">
+  <div class="session-info"><span>💾</span><strong id="session-info-text">新会话</strong></div>
+  <div class="session-actions">
+    <button id="save-snapshot-btn" class="outline tiny">💾 保存快照</button>
+    <button id="snapshots-btn" class="outline tiny">↻ 快照列表</button>
+    <button id="restore-auto-btn" class="outline tiny">恢复上次</button>
+    <button id="new-session-btn" class="secondary tiny">🆕 新会话</button>
+  </div>
+</div>
+
+<main>
+  <section>
+    <h2><span class="num">1</span>板与数据</h2>
+    <div class="plates-bar" id="plates-bar"></div>
+    <div class="plate-meta">
+      <input type="text" id="plate-name-input" placeholder="板名" />
+      <select id="plate-format-select" style="width:auto;flex:0;">
+        <option value="96">96 孔</option>
+        <option value="24">24 孔</option>
+      </select>
+    </div>
+    <p class="hint">当前板：<strong id="currentPlateLabel">—</strong> · 切换上方板标签查看不同板，分组可跨板分配</p>
+    <hr>
+    <p class="section-sub">粘贴数据到当前板</p>
+    <textarea id="data-input" placeholder="从 Excel / 酶标仪软件复制数字：&#10;0.342 0.356 0.298 ...&#10;或按行 / 列矩阵整体复制"></textarea>
+    <div class="row" style="margin-top:0.45rem;">
+      <button id="parse-btn" style="flex:1">解析到当前板</button>
+      <button id="load-demo-btn" class="outline tiny">载入示例</button>
+    </div>
+    <p class="format-info" id="parse-status"></p>
+    <p class="hint">支持 换行 / Tab / 逗号 / 空格分隔。数字按行优先顺序填入（A1→A12→B1→…）。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>当前板视图</h2>
+    <div class="row" style="justify-content:space-between;margin-bottom:0.75rem;">
+      <p class="hint" style="margin:0;">点击 / Ctrl+点击 / Shift+点击 选择孔位</p>
+      <button id="clear-wells-btn" class="secondary tiny">清空全部分组</button>
+    </div>
+    <div id="plate-container" style="text-align:center;overflow-x:auto;"></div>
+    <hr>
+    <p class="section-sub">操作提示</p>
+    <ul style="margin:0;padding-left:1.2rem;font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
+      <li>单击：只选该孔</li>
+      <li>Shift+点击：与上次点击形成矩形区域</li>
+      <li>Ctrl/Cmd+点击：切换单个孔的选中</li>
+      <li>分组可包含多板的孔（如技术重复在板 1 + 板 2）</li>
+      <li>已分配的孔可点击取消分配按钮移出分组</li>
+      <li>整行拖动或点击上下箭头可重排顺序，柱状图 X 轴会跟着变</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>分组管理</h2>
+    <div class="row" style="margin-bottom:0.55rem;">
+      <button id="new-group-btn" style="flex:1">+ 新建分组</button>' + "`n    </div>"
+    <div id="groups-list"></div>
+    <div class="actions">
+      <button id="assign-btn" style="flex:1">分配到选中孔</button>
+      <button id="unassign-btn" class="secondary">取消已分配</button>
+      <button id="deselect-btn" class="secondary">取消选择</button>
+    </div>
+    <hr>
+    <p class="section-sub">对照分组（用于归一化）</p>
+    <select id="control-select"></select>
+    <p class="hint">表中"板"列显示该分组数据来源的所有板名。</p>
+    <hr>
+    <h2 style="margin-top:0.5rem;"><span class="num">4</span>分析结果</h2>
+    <div class="row" style="flex-wrap:wrap;gap:0.75rem;margin-bottom:0.55rem;">
+      <div class="radio-group">
+        <label><input type="radio" name="chartMode" value="abs" checked> Absorbance</label>
+        <label><input type="radio" name="chartMode" value="viability"> Viability %</label>
+          <label><input type="radio" name="chartMode" value="heatmap"> 热图</label>
+      </div>
+      <div class="radio-group">
+        <label><input type="radio" name="statsMode" value="aggregate" checked> 聚合全部板</label>
+        <label><input type="radio" name="statsMode" value="currentPlate"> 仅当前板</label>
+      </div>
+    </div>
+    <div id="chart-container"></div>
+    <div id="results-table-container"></div>
+    <div class="actions" style="margin-top:0.65rem;">
+      <button id="export-csv-btn" class="outline">导出 CSV</button>
+      <button id="export-png-btn" class="outline">导出图表 PNG</button>
+    </div>
+  </section>
+
+  <section class="dr-section full-width" style="grid-column:1 / -1;">
+    <h2><span class="num">5</span>剂量响应 / 4PL 拟合 (log[inhibitor] vs response)</h2>
+    <p class="hint">为参与剂量响应的分组输入浓度（支持 <code>1uM</code> <code>5nM</code> <code>10pM</code> <code>1e-6</code> 等格式，空白将被忽略）。包含 0/零浓度对照有助于稳定拟合。归一化使用设置的对照分组（无对照时取最大均值）。</p>
+    <div id="dose-response-container"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+</body>
+</html>
+
+
+
+
+
+
+
+

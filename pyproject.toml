@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mtt-analyzer"
+version = "0.1.0"
+description = "Python Flask web app for MTT assay analysis: 4PL dose-response fitting (IC50), Welch t-test, Holm-Bonferroni, multi-plate support"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "906908891-gif" }]
+keywords = ["mtt", "assay", "4pl", "ic50", "dose-response", "welch-t-test", "flask"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "flask>=2.0",
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "scipy>=1.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/906908891-gif/mtt-analyzer"
+Issues = "https://github.com/906908891-gif/mtt-analyzer/issues"
+
+[tool.setuptools]
+packages = ["mtt_analyzer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
