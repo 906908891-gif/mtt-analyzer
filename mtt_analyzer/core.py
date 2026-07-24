@@ -50,6 +50,7 @@ class FourPLResult:
     ci95High: float = float("nan")
     iterations: int = 0
     method: str = "unknown"
+    warning: str = ""
 
     def to_dict(self):
         return asdict(self)
@@ -85,6 +86,7 @@ def _fit_scipy(log_x, y):
         se = np.sqrt(np.diag(np.abs(pcov))) if np.all(np.isfinite(pcov)) else np.full(4, np.nan)
         ci_low = 10 ** (logEC50 - 1.96 * se[2]) if math.isfinite(se[2]) else float("nan")
         ci_high = 10 ** (logEC50 + 1.96 * se[2]) if math.isfinite(se[2]) else float("nan")
+        warning = "confidence_intervals_unreliable" if len(log_x) < 5 else ""
         return FourPLResult(
             Top=float(T), Bottom=float(B), logEC50=float(logEC50), HillSlope=float(h),
             EC50=10 ** logEC50, R2=r2, ssRes=ss_res, ssTot=ss_tot,
@@ -92,6 +94,7 @@ def _fit_scipy(log_x, y):
             seTop=float(se[0]), seBottom=float(se[1]),
             seLogEC50=float(se[2]), seHillSlope=float(se[3]),
             ci95Low=ci_low, ci95High=ci_high, method="scipy_curve_fit",
+            warning=warning,
         )
     except Exception:
         return None
@@ -171,6 +174,7 @@ def _fit_pure_numpy(log_x, y):
     se_logEC50 = se[2] if math.isfinite(se[2]) else float("nan")
     ci_low = 10 ** (logEC50 - 1.96 * se_logEC50) if math.isfinite(se_logEC50) else float("nan")
     ci_high = 10 ** (logEC50 + 1.96 * se_logEC50) if math.isfinite(se_logEC50) else float("nan")
+    warning = "confidence_intervals_unreliable" if n < 5 else ""
     return FourPLResult(
         Top=float(T), Bottom=float(B), logEC50=float(logEC50), HillSlope=float(h),
         EC50=10 ** logEC50, R2=r2, ssRes=ss_res, ssTot=ss_tot,
@@ -179,6 +183,7 @@ def _fit_pure_numpy(log_x, y):
         seLogEC50=se_logEC50, seHillSlope=float(se[3]),
         ci95Low=ci_low, ci95High=ci_high,
         iterations=iterations, method="pure_numpy_LM",
+        warning=warning,
     )
 
 

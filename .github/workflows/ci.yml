@@ -32,15 +32,47 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install pytest gunicorn scipy
 
-      - name: Run tests
+      - name: Run unit tests
         run: |
-          pytest tests/ -v --tb=short --cov=mtt_analyzer
+          python -m unittest discover tests -p "test_*.py" -v
 
-      - name: Test Flask boot
+      - name: Run smoke tests
         run: |
           python -c "from app import create_app; app = create_app(); print('Flask app created OK')"
+          python -c "
+          import urllib.request
+          import json
+          from app import create_app
+          app = create_app()
+          client = app.test_client()
+          # Health
+          r = client.get('/api/health')
+          assert r.status_code == 200
+          # Index
+          r = client.get('/')
+          body = r.get_data(as_text=True)
+          assert '/static/style.css' in body
+          assert '/static/script.js' in body
+          assert 'defer' in body
+          # Fit 4PL with 4 points -> warning
+          r = client.post('/api/fit-4pl', json={
+              'log_conc': [-5, -4, -3, -2],
+              'viability': [80, 50, 20, 5],
+          })
+          assert r.status_code == 200
+          data = r.get_json()
+          assert 'warning' in data
+          assert data['warning'] == 'confidence_intervals_unreliable'
+          # Holm
+          r = client.post('/api/holm-bonferroni', json={'p_values': [0.01, 0.04, 0.03, 0.005]})
+          assert r.status_code == 200
+          adj = r.get_json()['adjusted']
+          assert abs(adj[0] - 0.03) < 1e-4
+          assert abs(adj[1] - 0.06) < 1e-4
+          print('All smoke tests passed')
+          "
 
   docker:
     runs-on: ubuntu-latest
@@ -49,9 +81,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Docker image
         run: docker build -t mtt-analyzer:test .
-      - name: Test container health endpoint
+      - name: Test container
         run: |
           docker run -d -p 5000:5000 --name mtt-test mtt-analyzer:test
-          sleep 5
+          sleep 8
           curl -sf http://localhost:5000/api/health || (docker logs mtt-test; exit 1)
           docker stop mtt-test

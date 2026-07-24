@@ -70,7 +70,7 @@ def test_welch_no_negative_p():
         a = [random.gauss(0.5, 0.1) for _ in range(5)]
         b = [random.gauss(0.3, 0.1) for _ in range(5)]
         r = welch_t_test(a, b)
-        assert 0.0 <= r["p"] <= 1.0, f"p={r['"p"']}"
+        assert 0.0 <= r["p"] <= 1.0, "p out of range"
 
 
 def test_holm_bonferroni_basic():

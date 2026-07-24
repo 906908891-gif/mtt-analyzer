@@ -5,8 +5,6 @@ WORKDIR /app
 # Install dependencies first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# Scipy is optional but recommended for better 4PL fit
-RUN pip install --no-cache-dir scipy
 
 # Copy application code
 COPY . .
@@ -19,9 +17,9 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5000
 
-# Healthcheck
+# Healthcheck - use single-quoted Python string inside JSON exec
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD python -c "import urllib.request; urllib.request.urlopen("http://localhost:5000/api/health").read()" || exit 1
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health').read()"]
 
-# Run with gunicorn in production mode
+# Run with gunicorn in production
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:create_app()"]

@@ -3,13 +3,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)]()
 [![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)]()
-[![GitHub Actions](https://img.shields.io/badge/CI-passing-brightgreen.svg)]()
+[![CI](https://github.com/906908891-gif/mtt-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/906908891-gif/mtt-analyzer/actions/workflows/ci.yml)
 [![GitHub](https://img.shields.io/badge/GitHub-906908891--gif-blue.svg)](https://github.com/906908891-gif/mtt-analyzer)
 
 一个用 **Python (Flask)** 写的 MTT 实验数据分析工具,提供网页界面 + REST API。
 
-- 🧪 多板数据管理 (6 / 24 / 96 孔)
-- 📊 4PL 剂量响应拟合 + IC50 + 95% CI
+- 🧪 多板数据管理 (24 / 96 孔)
+- 📊 4PL 剂量响应拟合 + IC50 + 95% CI (推荐 5+ 个独立浓度)
 - 📈 Welch t-test + Holm-Bonferroni 多重比较校正
 - 💾 localStorage 会话保存
 - 🚀 一键部署到 Render / Railway / Docker
@@ -18,7 +18,7 @@
 
 | 功能 | 描述 |
 |------|------|
-| 多板管理 | 同时处理多块 6/24/96 孔板,跨板合并数据 |
+| 多板管理 | 同时处理多块 24/96 孔板,跨板合并数据 |
 | 手动分组 | 可视化点击孔位 → 自定义实验组 / 对照组 |
 | 排序 | 拖动 / 上下箭头重排,柱状图 X 轴自动跟随 |
 | 浓度输入 | 支持 `1uM`, `10 nM`, `5e-6` 等格式 |
@@ -43,7 +43,7 @@ python app.py
 ```python
 from mtt_analyzer import fit_4pl
 
-# 4PL 拟合 (至少 4 个数据点,推荐 5-8 个)
+# 4PL 拟合 (至少 4 个数据点,推荐 5-8 个浓度,每个浓度 ≥3 复孔)
 log_conc = [-6, -5, -4, -3, -2]  # log10 M
 viability = [95.2, 78.3, 45.1, 12.4, 5.8]
 result = fit_4pl(log_conc, viability)
@@ -52,6 +52,8 @@ print(f"EC50: {result.EC50:.2e} M")
 print(f"95% CI: [{result.ci95Low:.2e}, {result.ci95High:.2e}]")
 print(f"R2: {result.R2:.4f}")
 print(f"Method: {result.method}")
+if result.warning:
+    print(f"⚠ {result.warning}")
 ```
 
 ```python
@@ -59,7 +61,7 @@ from mtt_analyzer.stats import welch_t_test, holm_bonferroni
 
 # Welch t-test
 r = welch_t_test([0.85, 0.87, 0.83], [0.45, 0.42, 0.48])
-print(f"p = {r['"'"'p'"'"']:.4f}, t = {r['"'"'t'"'"']:.3f}")
+print(f"p = {r['p']:.4f}, t = {r['t']:.3f}")
 
 # Holm-Bonferroni
 p_values = [0.01, 0.04, 0.03, 0.005]
@@ -82,7 +84,7 @@ mtt-analyzer/
 │   └── index.html                 # 前端 (script.js 用 defer 加载)
 ├── static/
 │   ├── style.css
-│   └── script.js                  # 前端交互 (含备用本地计算)
+│   └── script.js                  # 前端交互 (孔板渲染、热图、4PL 拟合)
 ├── tests/
 │   ├── test_core.py               # 4PL 拟合单测 (7 tests)
 │   ├── test_stats.py              # 统计单测 (13 tests)
@@ -90,10 +92,12 @@ mtt-analyzer/
 │   └── test_smoke.py              # Flask HTTP endpoint smoke tests (10 tests)
 ├── examples/
 │   └── sample.csv
-├── .github/workflows/ci.yml      # GitHub Actions CI (Python 3.9-3.12)
-├── Dockerfile                     # Docker 镜像 (gunicorn)
+├── .github/workflows/ci.yml      # GitHub Actions CI (Python 3.9-3.12 + Docker build)
+├── Dockerfile                     # Docker 镜像 (gunicorn + healthcheck)
+├── .dockerignore
 ├── render.yaml                    # Render.com 部署
 ├── Procfile                       # Heroku 部署
+├── runtime.txt
 ├── pyproject.toml
 ├── requirements.txt
 ├── README.md
@@ -110,7 +114,8 @@ y = Bottom + (Top - Bottom) / (1 + 10^((x - logEC50) * HillSlope))
 - 有 scipy 时: `scipy.optimize.curve_fit` (推荐)
 - 无 scipy 时: 纯 numpy 实现 (200 行)
 
-最少 4 个数据点 (推荐 5-8 个浓度,每个 3 个复孔)。
+最小 4 个数据点 (此时 `result.warning == "confidence_intervals_unreliable"`)
+推荐 5-8 个独立浓度,每个浓度 ≥3 个复孔 (CI 可靠)。
 
 ## 🔌 REST API
 
@@ -153,8 +158,10 @@ heroku open
 ## 🧪 运行测试
 
 ```bash
-pip install pytest pytest-cov
-pytest tests/ -v --cov=mtt_analyzer
+pip install pytest gunicorn scipy
+python -m unittest discover tests -p "test_*.py" -v
+# 或者
+pytest tests/ -v
 ```
 
 ## 📦 依赖
@@ -164,16 +171,20 @@ pytest tests/ -v --cov=mtt_analyzer
 - `scipy>=1.7` (推荐) - 4PL 拟合优化 (无 scipy 时降级到纯 numpy)
 - `gunicorn>=21.0` - 生产 WSGI 服务器
 
-## 🧪 测试覆盖
+## 📊 当前状态
 
-- ✅ 4PL 拟合 (perfect data, noise, too few points, minimum 4, predict)
-- ✅ Welch t-test (basic, same groups, degenerate, no negative p)
-- ✅ Holm-Bonferroni (basic, monotonic, single, empty)
-- ✅ Incomplete beta (endpoints, uniform, reference, symmetry)
-- ✅ Concentration parsing (unit variants, invalid)
-- ✅ CSV parsing (3 columns, short row)
-- ✅ Well expansion (single, range, bracket, dedup, empty)
-- ✅ Flask boot + endpoint smoke tests (CI only)
+- ✅ 单元测试: 34/34 通过 (test_core, test_stats, test_io)
+- ✅ Flask smoke tests: 10 个 (test_smoke.py)
+- ✅ 统计实现: NR Welch t-test + correct Holm-Bonferroni
+- ✅ 4PL 拟合: scipy + 纯 numpy fallback
+- ✅ 部署: Docker / Render / Railway / Heroku
+
+## ⚠️ 重要提醒
+
+- 单 HTML 前端版本不作为主推,主推 Flask 全栈
+- 4PL 拟合至少 4 点,推荐 5-8 个独立浓度
+- 真实 MTT 实验数据应先验证 controls 正常再分析
+- 如果 R² < 0.95 或 CI 跨度 > 100 倍,结果不可靠
 
 ## 📝 License
 
