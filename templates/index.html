@@ -6,7 +6,7 @@
 <title>MTT 实验数据分析器 - 多板版</title>
 
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='script.js') }}" defer></script>
 </head>
 <body>
 <header>
@@ -76,7 +76,8 @@
   <section>
     <h2><span class="num">3</span>分组管理</h2>
     <div class="row" style="margin-bottom:0.55rem;">
-      <button id="new-group-btn" style="flex:1">+ 新建分组</button>' + "`n    </div>"
+<button id="new-group-btn" style="flex:1">+ 新建分组</button>
+    </div>
     <div id="groups-list"></div>
     <div class="actions">
       <button id="assign-btn" style="flex:1">分配到选中孔</button>

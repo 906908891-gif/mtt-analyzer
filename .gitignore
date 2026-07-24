@@ -53,3 +53,6 @@ session-*.json
 .coverage
 htmlcov/
 .tox/
+
+# Docker
+docker-compose.override.yml

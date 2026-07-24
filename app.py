@@ -3,12 +3,18 @@
 Run locally:
     python app.py
 
+Environment variables:
+    PORT  - port to listen on (default 5000)
+    HOST  - bind address (default 0.0.0.0)
+    DEBUG - set to 1 to enable Flask debug mode
+
 Then open http://localhost:5000 in a browser.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 
 from flask import Flask, render_template, request, jsonify
 
@@ -69,9 +75,11 @@ def create_app():
         viability = data.get("viability", [])
         if not log_conc or not viability or len(log_conc) != len(viability):
             return jsonify({"error": "log_conc and viability must be non-empty and equal length"}), 400
+        if len(log_conc) < 4:
+            return jsonify({"error": "Need at least 4 points for 4PL fit"}), 400
         result = fit_4pl(log_conc, viability)
         if result is None:
-            return jsonify({"error": "fit failed (need at least 4 points)"}), 400
+            return jsonify({"error": "fit failed (data may be ill-conditioned)"}), 400
         return jsonify(result.to_dict())
 
     @app.route("/api/predict-4pl", methods=["POST"])
@@ -141,9 +149,9 @@ def create_app():
 
 def main():
     parser = argparse.ArgumentParser(description="MTT Analyzer Flask web app")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=5000)
-    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--host", default=os.environ.get("HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "5000")))
+    parser.add_argument("--debug", action="store_true", default=os.environ.get("DEBUG") == "1")
     args = parser.parse_args()
     app = create_app()
     print(f"  MTT Analyzer: http://{args.host}:{args.port}")

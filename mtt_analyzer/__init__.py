@@ -1,4 +1,4 @@
-"""__version__ = "0.1.0"
+__version__ = "0.1.0"
 
 from .core import fit_4pl, predict_4pl, FourPLResult
 from .stats import welch_t_test, holm_bonferroni, mean, sd, sem, cv
@@ -10,4 +10,3 @@ __all__ = [
     "parse_csv", "parse_concentration",
     "__version__",
 ]
-"""

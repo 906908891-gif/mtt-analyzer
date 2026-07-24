@@ -1,2 +1,4 @@
 flask>=2.0
 numpy>=1.20
+gunicorn>=21.0
+scipy>=1.7

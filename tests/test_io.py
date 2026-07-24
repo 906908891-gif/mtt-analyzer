@@ -2,11 +2,6 @@
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-import os
-try:
-    import pytest
-except ImportError:
-    pytest = None
 import tempfile
 
 from mtt_analyzer.io import parse_concentration, parse_csv, expand_wells
@@ -32,15 +27,37 @@ def test_parse_concentration_invalid():
     assert parse_concentration("abc") is None
 
 
-def test_parse_csv(tmp_path):
-    f = tmp_path / "data.csv"
-    csv_content = "plate,well,group\nA1,Control\nB1,Treatment\n"
-    f.write_text(csv_content, encoding="utf-8")
-    rows = parse_csv(str(f))
-    assert len(rows) == 2
-    assert rows[0]["plate"] == "A1"
-    assert rows[0]["group"] == "Control"
-    assert rows[1]["well"] == "B1"
+def test_parse_csv():
+    """CSV with 3 columns matching the header."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
+        f.write("plate,well,group\n")
+        f.write("board1,A1,Control\n")
+        f.write("board1,A2,Treatment\n")
+        path = f.name
+    try:
+        rows = parse_csv(path)
+        assert len(rows) == 2, len(rows)
+        assert rows[0]["plate"] == "board1"
+        assert rows[0]["well"] == "A1"
+        assert rows[0]["group"] == "Control"
+        assert rows[1]["group"] == "Treatment"
+    finally:
+        os.unlink(path)
+
+
+def test_parse_csv_short_row():
+    """CSV with fewer columns than header."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
+        f.write("a,b,c\n")
+        f.write("1,2\n")
+        path = f.name
+    try:
+        rows = parse_csv(path)
+        assert len(rows) == 1
+        assert rows[0]["a"] == "1"
+        assert rows[0]["b"] == "2"
+    finally:
+        os.unlink(path)
 
 
 def test_expand_wells_single():
