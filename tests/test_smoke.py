@@ -139,3 +139,45 @@ def test_compute_stats_endpoint():
     g2 = next(g for g in data["groups"] if g["id"] == "g2")
     assert g2["pValue"] < 0.001
     assert g2["pAdjusted"] >= g2["pValue"]
+
+
+def test_compute_stats_handles_single_replicate():
+    c = _client()
+    r = c.post("/api/compute-stats", json={
+        "control_id": "g1",
+        "groups": [
+            {"id": "g1", "name": "Control", "values": [0.85, 0.87, 0.83, 0.86]},
+            {"id": "g2", "name": "TrtA", "values": [0.45, 0.42, 0.48]},
+            {"id": "g3", "name": "Single", "values": [0.5]},
+            {"id": "g4", "name": "TrtC", "values": [0.30, 0.32, 0.28]},
+        ],
+    })
+    assert r.status_code == 200
+    data = r.get_json()
+    assert len(data["groups"]) == 4
+    # g3 single-replicate -> marked 样本不足
+    g3 = next(g for g in data["groups"] if g["id"] == "g3")
+    assert g3["note"] == "样本不足"
+    assert g3["pValue"] is None
+    assert g3["pAdjusted"] is None
+    assert g3["significance"] == "N/A"
+    # g2 and g4 (n>=2) get p-values
+    g2 = next(g for g in data["groups"] if g["id"] == "g2")
+    assert g2["pValue"] is not None
+    assert g2["pAdjusted"] is not None
+    g4 = next(g for g in data["groups"] if g["id"] == "g4")
+    assert g4["pValue"] is not None
+    # Holm-adjusted p should only consider 2 groups (g2, g4), not g3
+    assert g2["pAdjusted"] >= g2["pValue"]
+
+
+def test_compute_stats_control_too_small():
+    c = _client()
+    r = c.post("/api/compute-stats", json={
+        "control_id": "g1",
+        "groups": [
+            {"id": "g1", "name": "Control", "values": [0.85]},
+            {"id": "g2", "name": "Trt", "values": [0.45, 0.42, 0.48]},
+        ],
+    })
+    assert r.status_code == 400

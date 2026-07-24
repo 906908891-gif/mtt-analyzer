@@ -110,12 +110,13 @@ def create_app():
         if len(control_values) < 2:
             return jsonify({"error": "control group needs >= 2 values"}), 400
 
+        MIN_N = 2  # minimum replicates for Welch t-test
         results = []
         for g in groups:
             values = [float(v) for v in g.get("values", [])]
             if not values:
                 continue
-            results.append({
+            entry = {
                 "id": g.get("id"),
                 "name": g.get("name", ""),
                 "color": g.get("color", "#0891b2"),
@@ -125,12 +126,24 @@ def create_app():
                 "sem": sem(values),
                 "cv": cv(values),
                 "values": values,
-            })
+            }
+            if len(values) < MIN_N:
+                # Single-replicate group: cannot compute t-test
+                entry["note"] = "样本不足"
+                entry["pValue"] = None
+                entry["pAdjusted"] = None
+                entry["significance"] = "N/A"
+                entry["viability"] = None
+            results.append(entry)
 
         ctrl_stats = next((r for r in results if r["id"] == control_id), None)
         if not ctrl_stats:
             return jsonify({"error": "control stats missing"}), 400
-        comp_stats = [r for r in results if r["id"] != control_id]
+
+        # Only groups with n >= MIN_N enter Holm-Bonferroni correction
+        comp_stats = [r for r in results if r["id"] != control_id and r["n"] >= MIN_N]
+        insufficient = [r for r in results if r["id"] != control_id and r["n"] < MIN_N]
+
         p_raw = [welch_t_test(r["values"], control_values)["p"] for r in comp_stats]
         p_adj = holm_bonferroni(p_raw)
         for r, p, pa in zip(comp_stats, p_raw, p_adj):
@@ -138,10 +151,13 @@ def create_app():
             r["pAdjusted"] = pa
             r["significance"] = significance_stars(pa)
             r["viability"] = (r["mean"] / ctrl_stats["mean"]) * 100.0
+
+        # Note for control
         ctrl_stats["viability"] = 100.0
         ctrl_stats["pValue"] = None
         ctrl_stats["pAdjusted"] = None
         ctrl_stats["significance"] = ""
+
         return jsonify({"groups": results, "control": ctrl_stats})
 
     return app

@@ -10,6 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
@@ -34,45 +35,68 @@ jobs:
           pip install -r requirements.txt
           pip install pytest gunicorn scipy
 
-      - name: Run unit tests
-        run: |
-          python -m unittest discover tests -p "test_*.py" -v
+      - name: Run tests with pytest
+        run: python -m pytest tests -q
 
-      - name: Run smoke tests
+      - name: Run extra smoke tests
         run: |
           python -c "from app import create_app; app = create_app(); print('Flask app created OK')"
-          python -c "
+          python << 'PYEOF'
           import urllib.request
-          import json
           from app import create_app
           app = create_app()
           client = app.test_client()
           # Health
-          r = client.get('/api/health')
+          r = client.get("/api/health")
           assert r.status_code == 200
           # Index
-          r = client.get('/')
+          r = client.get("/")
           body = r.get_data(as_text=True)
-          assert '/static/style.css' in body
-          assert '/static/script.js' in body
-          assert 'defer' in body
+          assert "/static/style.css" in body
+          assert "/static/script.js" in body
+          assert "defer" in body
           # Fit 4PL with 4 points -> warning
-          r = client.post('/api/fit-4pl', json={
-              'log_conc': [-5, -4, -3, -2],
-              'viability': [80, 50, 20, 5],
+          r = client.post("/api/fit-4pl", json={
+              "log_conc": [-5, -4, -3, -2],
+              "viability": [80, 50, 20, 5],
           })
           assert r.status_code == 200
           data = r.get_json()
-          assert 'warning' in data
-          assert data['warning'] == 'confidence_intervals_unreliable'
-          # Holm
-          r = client.post('/api/holm-bonferroni', json={'p_values': [0.01, 0.04, 0.03, 0.005]})
+          assert "warning" in data
+          assert data["warning"] == "confidence_intervals_unreliable"
+          # Fit 4PL with 5 points -> clean
+          r = client.post("/api/fit-4pl", json={
+              "log_conc": [-6, -5, -4, -3, -2],
+              "viability": [95, 70, 40, 15, 5],
+          })
           assert r.status_code == 200
-          adj = r.get_json()['adjusted']
+          data = r.get_json()
+          assert data["warning"] == ""
+          # Holm
+          r = client.post("/api/holm-bonferroni", json={"p_values": [0.01, 0.04, 0.03, 0.005]})
+          assert r.status_code == 200
+          adj = r.get_json()["adjusted"]
           assert abs(adj[0] - 0.03) < 1e-4
           assert abs(adj[1] - 0.06) < 1e-4
-          print('All smoke tests passed')
-          "
+          # Compute stats: n<2 group -> error, exclude from Holm
+          r = client.post("/api/compute-stats", json={
+              "control_id": "g1",
+              "groups": [
+                  {"id": "g1", "name": "Control", "values": [0.85, 0.87, 0.83]},
+                  {"id": "g2", "name": "Trt1", "values": [0.45, 0.42, 0.48]},
+                  {"id": "g3", "name": "Single", "values": [0.5]},
+              ],
+          })
+          assert r.status_code == 200
+          data = r.get_json()
+          single = next(g for g in data["groups"] if g["id"] == "g3")
+          assert single.get("note") == "样本不足", single
+          assert single.get("pValue") is None, single
+          # Holm should only include groups with n>=2
+          trt1 = next(g for g in data["groups"] if g["id"] == "g2")
+          assert trt1.get("pValue") is not None, trt1
+          print("All smoke tests passed")
+          PYEOF
 
   docker:
     runs-on: ubuntu-latest
